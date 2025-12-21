@@ -46,17 +46,17 @@ let
           if
             cfg.features != [ ]
             || cfg.noDefaultFeatures
-            || cfg.electrum.enable == false
-            || cfg.rpc.enable == false
-            || cfg.zmq-server.enable == true
-            || cfg.cfilters.enable == false
-            || cfg.metrics == true
-            || cfg.tokio-console == true
+            || cfg.electrum.enable
+            || cfg.rpc.enable
+            || cfg.zmq-server.enable
+            || cfg.cfilters.enable
+            || cfg.metrics
+            || cfg.tokio-console
           then
-            cfg.package.override (old: {
+            cfg.package.override {
               buildFeatures = cfg.features;
               buildNoDefaultFeatures = cfg.noDefaultFeatures;
-            })
+            }
           else
             pkgs.floresta or (throw "floresta package not found in pkgs");
         defaultText = literalExpression "pkgs.floresta";
@@ -730,15 +730,17 @@ in
       );
     };
 
-    users.users.${cfg.user} = {
-      isSystemUser = true;
-      group = cfg.group;
-      description = "Floresta daemon user";
-      home = cfg.dataDir;
-    };
+    users = {
+      groups.${cfg.group} = { };
+      groups.floresta-rpc = { };
 
-    users.groups.${cfg.group} = { };
-    users.groups.floresta-rpc = { };
+      users.${cfg.user} = {
+        inherit (cfg) group;
+        isSystemUser = true;
+        description = "Floresta daemon user";
+        home = cfg.dataDir;
+      };
+    };
 
     # nix-bitcoin integration (optional)
     nix-bitcoin.operator.groups = optionals (config.nix-bitcoin.operator or null != null) [ cfg.group ];
