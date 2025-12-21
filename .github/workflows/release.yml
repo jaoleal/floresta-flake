@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-release:
+    name: Build and Release ${{ matrix.package }} for ${{ matrix.system }}
+    strategy:
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+            package: florestad
+
+          - system: x86_64-linux
+            runner: ubuntu-latest
+            package: floresta-cli
+
+          - system: aarch64-linux
+            runner: ubuntu-latest-arm64
+            package: florestad
+
+          - system: aarch64-linux
+            runner: ubuntu-latest-arm64
+            package: floresta-cli
+
+          - system: x86_64-darwin
+            runner: macos-14
+            package: florestad
+
+          - system: x86_64-darwin
+            runner: macos-14
+            package: floresta-cli
+
+          - system: aarch64-darwin
+            runner: macos-14
+            package: florestad
+
+          - system: aarch64-darwin
+            runner: macos-14
+            package: floresta-cli
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - uses: cachix/cachix-action@v15
+        with:
+          name: floresta-flake
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - uses: extractions/setup-just@v2
+
+      - name: Build and package ${{ matrix.package }}
+        run: |
+          just build ${{ matrix. package }}
+          just _package-binary ${{ matrix.package }} ${{ matrix.system }}
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/${{ matrix.package }}-${{ matrix.system }}/*
+          draft: false
+          prerelease: true
