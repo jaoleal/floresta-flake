@@ -17,7 +17,7 @@ let
           "floresta-debug"
         ];
         default = "all";
-        description = lib.mdDoc ''
+        description = ''
           Which floresta package variant to build.
 
           - `all`: Builds all components (CLI, Node and lib)
@@ -32,18 +32,18 @@ let
       src = mkOption {
         type = types.path;
         default = pkgs.fetchFromGitHub {
-          rev = "master";
+          rev = "eb03116ed513c22297c1d4bc8d07a71c44de00af";
           owner = "vinteumorg";
           repo = "floresta";
           hash = "sha256-93piWE61HSAKOSGws6s9+ooqV0g1glCwr/HVHjGz1y0=";
         };
-        description = lib.mdDoc ''
+        description = ''
           Source tree for the Floresta project.
 
           By default, fetches the latest master branch from GitHub.
           Can be overridden to use a local checkout or specific revision.
         '';
-        example = lib.literalExpression ''
+        example = ''
           pkgs.fetchFromGitHub {
             owner = "vinteumorg";
             repo = "floresta";
@@ -56,7 +56,7 @@ let
       features = mkOption {
         type = types.listOf types.str;
         default = [ ];
-        description = lib.mdDoc ''
+        description = ''
           Additional cargo features to enable during build.
 
           These are passed directly to `cargo build --features`.
@@ -85,7 +85,7 @@ let
       extraBuildInputs = mkOption {
         type = types.listOf types.package;
         default = [ ];
-        description = lib.mdDoc ''
+        description = ''
           Inputs to be included during build time of floresta.
         '';
       };
@@ -93,7 +93,7 @@ let
       doCheck = mkOption {
         type = types.bool;
         default = true;
-        description = lib.mdDoc ''
+        description = ''
           Whether to run tests during the build, deactivate if youre limited on resources.
 
           Only offline tests are executed.
@@ -182,10 +182,8 @@ let
       inherit (pkgConfig) pname description cargoBuildFlags;
       inherit (cfg) src doCheck;
 
-      # Build the final features list
       buildFeatures = cfg.features ++ (cfg.extraFeatures or [ ]);
 
-      # Platform-specific dependencies
       nativeBuildInputs = [
         pkgs.openssl
         pkgs.pkg-config
@@ -241,15 +239,12 @@ let
     };
 
 in
-# Export both the builder and a default build
 {
   # The main builder function
   build = mkFloresta;
 
-  # Convenience:  default package
   default = mkFloresta { };
 
-  # Convenience: pre-configured variants
   florestad = mkFloresta { packageName = "florestad"; };
   floresta-cli = mkFloresta { packageName = "floresta-cli"; };
   libfloresta = mkFloresta { packageName = "libfloresta"; };
