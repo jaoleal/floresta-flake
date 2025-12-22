@@ -35,7 +35,7 @@ let
           rev = "eb03116ed513c22297c1d4bc8d07a71c44de00af";
           owner = "vinteumorg";
           repo = "floresta";
-          hash = "sha256-93piWE61HSAKOSGws6s9+ooqV0g1glCwr/HVHjGz1y0=";
+          hash = "sha256-2efto4VWT7satrQoWSsg0YDWZlVDgvMNLEHrN+UUbGY=";
         };
         description = ''
           Source tree for the Floresta project.
