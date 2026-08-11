@@ -12,9 +12,10 @@
 let
   inherit (pkgs) lib;
 
-  # nixpkgs' androidndk-pkgs only supports x86_64 build hosts;
-  # aarch64-darwin and aarch64-linux are not mapped.
-  ndkSupported = system == "x86_64-linux" || system == "x86_64-darwin";
+  # Only x86_64-linux can drive the NDK: the prebuilt toolchain this file
+  # points cargo at is the linux-x86_64 one (see ndkToolchain below), and
+  # nixpkgs' androidndk-pkgs does not map aarch64 build hosts at all.
+  ndkSupported = system == "x86_64-linux";
 
   # Android NDK configuration.
   androidConfig = {
@@ -30,9 +31,10 @@ let
   # with the NDK's android.toolchain.cmake to build libbitcoinkernel for
   # the target ABI.
   #
+  # abi:        ABI name carried in the package names (e.g. "aarch64-android")
   # rustTarget: Rust target triple (e.g. "aarch64-linux-android")
   mkAndroidBuild =
-    rustTarget:
+    abi: rustTarget:
     let
       nativePkgs = import inputs.nixpkgs {
         inherit system;
@@ -99,6 +101,10 @@ let
       defaultSrc = masterSrc;
       rustPlatform = androidRustPlatform;
 
+      # The ABI is what tells these builds apart, so it belongs in the
+      # package name itself.
+      pnameSuffix = "-${abi}";
+
       # Disable the default cargoBuildHook / cargoInstallHook — they
       # don't handle cross-compilation via --target properly.
       dontCargoBuild = true;
@@ -152,22 +158,20 @@ let
       };
       extraNativeBuildInputsGlobal = [ sdk ];
     };
+  # Cross-compiled Floresta for Android — requires the NDK cross
+  # toolchain, which nixpkgs only supports on x86_64 hosts.
 in
-# Cross-compiled Floresta for Android — requires the NDK cross
-# toolchain, which nixpkgs only supports on x86_64 hosts.
 lib.optionalAttrs ndkSupported (
-  # Package name suffix -> Rust target triple.  x86_64 is the emulator
-  # ABI; the other two are the device ABIs.
-  lib.concatMapAttrs
+  # ABI -> Rust target triple.  x86_64 is the emulator ABI; the other two
+  # are the device ABIs.
+  lib.mapAttrs
     (
-      suffix: rustTarget:
-      lib.mapAttrs' (name: lib.nameValuePair "${name}-${suffix}") (
-        lib.getAttrs [
-          "florestad"
-          "floresta-cli"
-          "libfloresta"
-        ] (mkAndroidBuild rustTarget)
-      )
+      abi: rustTarget:
+      # Carry the target the build was compiled for, so consumers can ask the
+      # package instead of inferring it from the attribute name.  Attached
+      # with // rather than overrideAttrs: floresta-build.nix replaces
+      # passthru.overrideAttrs with a self-recursive definition.
+      (mkAndroidBuild abi rustTarget).default // { inherit rustTarget; }
     )
     {
       aarch64-android = "aarch64-linux-android";
