@@ -27,9 +27,16 @@
         in
         {
           packages = {
+            # Everything Floresta publishes, from one build of the workspace.
+            inherit (florestaBuild) default;
+
+            # Or build a single component, or a variant, with mkFloresta.
             florestad = florestaBuild.mkFloresta { packageName = "florestad"; };
-            floresta-cli = florestaBuild.mkFloresta { packageName = "floresta-cli"; };
-            default = florestaBuild.mkFloresta { packageName = "all"; };
+
+            florestad-debug = florestaBuild.mkFloresta {
+              packageName = "florestad";
+              profile = "debug";
+            };
           };
         }
       );
@@ -48,7 +55,7 @@
               {
                 services.floresta = {
                   enable = true;
-                  package = florestaBuild.florestad;
+                  package = florestaBuild.mkFloresta { packageName = "florestad"; };
                   network = "signet";
                   electrum.address = "127.0.0.1:50001";
                   rpc.address = "127.0.0.1:38332";
