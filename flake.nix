@@ -37,6 +37,68 @@
           self',
           ...
         }:
+        let
+          inherit (pkgs) lib;
+
+          # Upstream Floresta source — pinned via flake input, shared by
+          # default builds, master builds, and Android cross-compilation.
+          # Update with: nix flake update floresta-master
+          masterSrc = inputs.floresta-master;
+
+          fetchTag =
+            rev: hash:
+            pkgs.fetchFromGitHub {
+              owner = "getfloresta";
+              repo = "Floresta";
+              inherit rev hash;
+            };
+
+          # Every Floresta tree this flake pins, keyed by the release it is.
+          releaseSrcs = {
+            master = masterSrc;
+            v0_9_1 = fetchTag "v0.9.1" "sha256-5dfE0Bd0yCDh7Kc0PsSXjBWLQ9WmNCCbropdXfK9YSk=";
+            v0_9_0 = fetchTag "v0.9.0" "sha256-8GXCHvk6xxT93c073W15L0+xpri8lQvIcIdDcPead8I=";
+          };
+
+          # The build library of each release, built from its source tree.
+          releaseBuilds = lib.mapAttrs (
+            _release: src:
+            import ./lib/floresta-build.nix {
+              inherit pkgs;
+              defaultSrc = src;
+            }
+          ) releaseSrcs;
+
+          # A release is its native build, with cross builds attached as
+          # attributes: `.#master.aarch64-android`. Only master carries the
+          # Android builds. Attached with // rather than passthru:
+          # floresta-build.nix defines passthru.overrideAttrs
+          # self-recursively, so overriding would rebuild the set.
+          releases = lib.mapAttrs (
+            release: build: build.default // lib.optionalAttrs (release == "master") androidPackages
+          ) releaseBuilds;
+
+          # Android outputs: one cross-compiled Floresta per ABI, keyed by it.
+          # Only present on hosts that can drive the NDK.
+          # See lib/android-outputs.nix.
+          androidPackages = import ./lib/android-outputs.nix {
+            inherit
+              pkgs
+              inputs
+              system
+              masterSrc
+              ;
+          };
+
+          # Release attestation — see lib/attestation.nix.
+          attestation = import ./lib/attestation.nix {
+            inherit pkgs;
+            # Tagged versions only
+            releases = removeAttrs releases [ "master" ];
+            trustedKeys = ./contrib/trusted-keys;
+            sigs = ./contrib/sigs;
+          };
+        in
         {
           _module.args.pkgs = import inputs.nixpkgs { inherit system; };
 
@@ -46,6 +108,7 @@
                 root = ./.;
                 fileset = pkgs.lib.fileset.unions [
                   ./lib/android-outputs.nix
+                  ./lib/attestation.nix
                   ./lib/floresta-build.nix
                   ./lib/floresta-service.nix
                   ./lib/floresta-service-eval-test.nix
@@ -66,6 +129,10 @@
               inherit pkgs;
               flakeInputs = inputs;
             };
+
+            # The same verifier `nix run .#verify` runs, against what is
+            # committed.
+            attestations = attestation.check;
           }
           // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             service-vm-test = import ./lib/floresta-service-vm-test.nix {
@@ -75,75 +142,18 @@
           };
 
           packages =
-            let
-              inherit (pkgs) lib;
+            releases
+            # attestation-manifest-<version>: the SHA256SUMS of one release.
+            // lib.mapAttrs' (
+              version: lib.nameValuePair "attestation-manifest-${version}"
+            ) attestation.manifests;
 
-              # Upstream Floresta source — pinned via flake input, shared by
-              # default builds, master builds, and Android cross-compilation.
-              # Update with: nix flake update floresta-master
-              masterSrc = inputs.floresta-master;
-
-              # Build every Floresta variant from one source tree.
-              mkVersionedBuild =
-                src:
-                import ./lib/floresta-build.nix {
-                  inherit pkgs;
-                  defaultSrc = src;
-                };
-
-              fetchTag =
-                rev: hash:
-                pkgs.fetchFromGitHub {
-                  owner = "getfloresta";
-                  repo = "Floresta";
-                  inherit rev hash;
-                };
-
-              masterBuild = mkVersionedBuild masterSrc;
-
-              # Sources for upstream release tags.  Attribute names become
-              # the package suffix (florestad-v0_9_1, ...).
-              taggedSrcs = {
-                v0_9_1 = fetchTag "v0.9.1" "sha256-5dfE0Bd0yCDh7Kc0PsSXjBWLQ9WmNCCbropdXfK9YSk=";
-                v0_9_0 = fetchTag "v0.9.0" "sha256-8GXCHvk6xxT93c073W15L0+xpri8lQvIcIdDcPead8I=";
-              };
-
-              # Versioned builds from upstream release tags (native only).
-              # These use libbitcoinkernel-sys 0.2.0 which requires bindgen
-              # and builds Bitcoin Core from source.
-              taggedPackages = lib.concatMapAttrs (
-                version: src:
-                lib.mapAttrs' (name: lib.nameValuePair "${name}-${version}") (
-                  lib.getAttrs [
-                    "florestad"
-                    "floresta-cli"
-                    "libfloresta"
-                  ] (mkVersionedBuild src)
-                )
-              ) taggedSrcs;
-            in
-            {
-              # Native packages — built from the floresta-master flake input
-              # (android_patched_bitcoinkernel branch).
-              inherit (masterBuild)
-                florestad
-                floresta-cli
-                libfloresta
-                floresta-debug
-                default
-                ;
-            }
-            // taggedPackages
-            # Android outputs: cross-compiled Floresta binaries and
-            # libraries. See lib/android-outputs.nix.
-            // import ./lib/android-outputs.nix {
-              inherit
-                pkgs
-                inputs
-                system
-                masterSrc
-                ;
-            };
+          # The attestation verbs.
+          apps = {
+            verify.program = attestation.verify;
+            attest.program = attestation.attest;
+            releases.program = attestation.listReleases;
+          };
 
           formatter = pkgs.nixfmt-classic;
 
