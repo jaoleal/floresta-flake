@@ -17,15 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         attr:
-          - florestad-aarch64-android
-          - floresta-cli-aarch64-android
-          - libfloresta-aarch64-android
-          - florestad-armv7a-android
-          - floresta-cli-armv7a-android
-          - libfloresta-armv7a-android
-          - florestad-x86_64-android
-          - floresta-cli-x86_64-android
-          - libfloresta-x86_64-android
+          - aarch64-android
+          - armv7a-android
+          - x86_64-android
     steps:
       - name: Free disk space
         run: |
