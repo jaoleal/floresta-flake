@@ -1,0 +1,138 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Builds every release artifact, records GitHub build provenance for them,
+# and publishes them to a GitHub Release.
+#
+# Artifact names match what the attestation manifest uses, so the published
+# SHA256SUMS can be compared line for line against the attestations in
+# contrib/sigs/. The triples below must therefore stay in step with
+# lib/attestation.nix, which derives them from the Rust target of each build.
+
+name: Build and Attest
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.triple }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── Native ───────────────────────────────────────────────
+          - runner: ubuntu-latest
+            attr: master
+            triple: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            attr: master
+            triple: aarch64-unknown-linux-gnu
+          - runner: macos-14
+            attr: master
+            triple: aarch64-apple-darwin
+
+          # ── Android cross (x86_64-linux host) ────────────────────
+          - runner: ubuntu-latest
+            attr: master.aarch64-android
+            triple: aarch64-linux-android
+          - runner: ubuntu-latest
+            attr: master.armv7a-android
+            triple: armv7-linux-androideabi
+          - runner: ubuntu-latest
+            attr: master.x86_64-android
+            triple: x86_64-linux-android
+
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Free disk space
+        if: startsWith(matrix.runner, 'ubuntu')
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android \
+            /opt/ghc /usr/local/share/boost /opt/hostedtoolcache
+          sudo docker image prune --all --force
+
+      - uses: actions/checkout@v7
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - uses: cachix/cachix-action@v17
+        with:
+          name: floresta-flake
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: Build and collect ${{ matrix.triple }}
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          echo "::group::nix build .#${{ matrix.attr }}"
+          nix build -L ".#${{ matrix.attr }}" --out-link result-release
+          echo "::endgroup::"
+
+          # One build of the release carries every artifact for this target.
+          # Which files those are is read off the result, matching what
+          # lib/attestation.nix hashes.
+          found=0
+          for dir in bin lib; do
+            [ -d "result-release/${dir}" ] || continue
+            for artifact in "result-release/${dir}"/*; do
+              [ -f "${artifact}" ] || continue
+              cp -L "${artifact}" "results/$(basename "${artifact}")-${{ matrix.triple }}"
+              found=$((found + 1))
+            done
+          done
+          [ "${found}" -gt 0 ] || { echo "error: ${{ matrix.attr }} produced no files under bin/ or lib/" >&2; exit 1; }
+          chmod -R u+w results
+          ls -l results
+
+      - name: Upload ${{ matrix.triple }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: floresta-${{ matrix.triple }}
+          path: results/*
+          if-no-files-found: error
+
+  attest-and-release:
+    name: Attest and Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: results
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd results
+          sha256sum -- * | LC_ALL=C sort -k2 > ../SHA256SUMS
+          mv ../SHA256SUMS .
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            results/*
+            !results/SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: results/*

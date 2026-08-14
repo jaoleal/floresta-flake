@@ -5,8 +5,11 @@ name: Android
 on:
   push:
     branches: [master]
+    paths-ignore: ["contrib/sigs/**"]
   pull_request:
     branches: [master]
+    # See ci.yml: attestation PRs touch signed manifests only.
+    paths-ignore: ["contrib/sigs/**"]
   workflow_dispatch:
 
 jobs:
@@ -17,9 +20,9 @@ jobs:
       fail-fast: false
       matrix:
         attr:
-          - aarch64-android
-          - armv7a-android
-          - x86_64-android
+          - master.aarch64-android
+          - master.armv7a-android
+          - master.x86_64-android
     steps:
       - name: Free disk space
         run: |

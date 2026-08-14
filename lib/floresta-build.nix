@@ -344,12 +344,4 @@ in
   default = mkFloresta { };
 
   debug = mkFloresta { profile = "debug"; };
-
-  florestad = mkFloresta { packageName = "florestad"; };
-  floresta-cli = mkFloresta { packageName = "floresta-cli"; };
-  libfloresta = mkFloresta { packageName = "libfloresta"; };
-  floresta-debug = mkFloresta {
-    profile = "debug";
-    features = [ "metrics" ];
-  };
 }

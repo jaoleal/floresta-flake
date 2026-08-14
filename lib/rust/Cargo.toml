@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Only here so cargo and rust-analyzer understand these sources; the flake
+# compiles them directly with rustc — see lib/attestation.nix.
+[package]
+name = "floresta-attestation"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "floresta-verify"
+path = "verify.rs"
+
+[[bin]]
+name = "floresta-attest"
+path = "attest.rs"

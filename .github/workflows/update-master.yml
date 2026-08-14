@@ -49,8 +49,8 @@ jobs:
             Automated sync of the `floresta-master` flake input
             (`getfloresta/Floresta/android_patched_bitcoinkernel`).
 
-            This updates the upstream Floresta pin, which affects:
-            - All default native packages (`florestad`, `floresta-cli`, `libfloresta`)
-            - All Android cross-compilation targets
+            This updates the upstream Floresta pin, which affects every
+            member of the `master` release (and its `debug` profile): the
+            native packages and the Android cross targets.
           labels: dependencies
           delete-branch: true

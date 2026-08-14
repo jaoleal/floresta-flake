@@ -3,24 +3,24 @@
 ## Floresta Android binaries
 
 floresta-nix cross-compiles Floresta for Android using the NDK prebuilt
-toolchain. Available on **x86_64-linux** and **x86_64-darwin** only
-(nixpkgs' androidndk-pkgs does not map aarch64 build hosts yet).
+toolchain. Available on **x86_64-linux** only: the prebuilt toolchain is
+the linux-x86_64 one, and nixpkgs' androidndk-pkgs does not map aarch64
+build hosts at all.
 
-| Package                        | Target               |
-| ------------------------------ | -------------------- |
-| `florestad-aarch64-android`    | aarch64 (arm64-v8a)  |
-| `floresta-cli-aarch64-android` | aarch64 (arm64-v8a)  |
-| `libfloresta-aarch64-android`  | aarch64 (arm64-v8a)  |
-| `florestad-armv7a-android`     | armv7a (armeabi-v7a) |
-| `floresta-cli-armv7a-android`  | armv7a (armeabi-v7a) |
-| `libfloresta-armv7a-android`   | armv7a (armeabi-v7a) |
-| `florestad-x86_64-android`     | x86_64 (emulator)    |
-| `floresta-cli-x86_64-android`  | x86_64 (emulator)    |
-| `libfloresta-x86_64-android`   | x86_64 (emulator)    |
+These are cross targets of the master tree, so they hang off the `master`
+release. Each is one build of the workspace for that ABI, carrying the same
+artifacts the native build does: `florestad` and `floresta-cli` under `bin/`,
+the `libfloresta` shared and static libraries under `lib/`.
+
+| Package                  | Target               |
+| ------------------------ | -------------------- |
+| `master.aarch64-android` | aarch64 (arm64-v8a)  |
+| `master.armv7a-android`  | armv7a (armeabi-v7a) |
+| `master.x86_64-android`  | x86_64 (emulator)    |
 
 ```bash
-nix build .#florestad-aarch64-android
-nix build .#libfloresta-armv7a-android
+nix build .#master.aarch64-android
+ls result/lib
 ```
 
 ---

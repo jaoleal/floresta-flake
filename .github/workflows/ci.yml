@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [master]
+    paths-ignore: ["contrib/sigs/**"]
   pull_request:
     branches: [master]
+    # Attestation PRs add signed manifests and nothing else; rebuilding the
+    # whole matrix to review two text files is pure waste.
+    paths-ignore: ["contrib/sigs/**"]
   schedule:
     - cron: "0 6 * * 1" # Every Monday at 06:00 UTC
   workflow_dispatch:
@@ -65,17 +69,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [florestad, floresta-cli, libfloresta, default]
+        # One build of the workspace is the whole release, so there is
+        # nothing to split across jobs.
+        package: [master]
         system: [x86_64-linux, x86_64-darwin, aarch64-linux, aarch64-darwin]
-        exclude:
-          - system: aarch64-linux
-            package: libfloresta
-          - system: aarch64-linux
-            package: default
-          - system: aarch64-darwin
-            package: libfloresta
-          - system: aarch64-darwin
-            package: default
     runs-on: >-
       ${{
         contains(matrix.system, 'darwin') && 'macos-14' ||

@@ -13,3 +13,6 @@ devenv.local.yaml
 # pre-commit
 .pre-commit-config.yaml
 artifacts
+
+# Cargo (lib/rust is compiled by the flake; cargo is only for the LSP)
+lib/rust/target
